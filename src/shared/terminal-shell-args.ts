@@ -1,28 +1,34 @@
 /**
- * Splits a shell arguments string into separate tokens, respecting single and double quotes.
+ * Splits a shell arguments string into separate tokens, respecting single and double quotes
+ * and variable whitespace. Preserves empty quoted arguments (e.g. `""` or `''`).
  */
 export function parseShellArgs(input: string): string[] {
   const args: string[] = []
   let current = ''
   let inDouble = false
   let inSingle = false
+  let hasToken = false
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i]
     if (ch === '"' && !inSingle) {
       inDouble = !inDouble
+      hasToken = true
     } else if (ch === "'" && !inDouble) {
       inSingle = !inSingle
-    } else if (ch === ' ' && !inDouble && !inSingle) {
-      if (current) {
+      hasToken = true
+    } else if (/\s/.test(ch) && !inDouble && !inSingle) {
+      if (hasToken) {
         args.push(current)
         current = ''
+        hasToken = false
       }
     } else {
       current += ch
+      hasToken = true
     }
   }
-  if (current) {
+  if (hasToken) {
     args.push(current)
   }
   return args

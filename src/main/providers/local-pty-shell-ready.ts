@@ -107,8 +107,11 @@ export function getShellLaunchConfig(
     if (!args) {
       return UNWRAPPED
     }
+    const userArgs = (customShellArgs ?? []).filter(
+      (a, i, arr) => a !== '--rcfile' && arr[i - 1] !== '--rcfile'
+    )
     return {
-      args,
+      args: [...args, ...userArgs],
       env: {
         [SHELL_STARTUP_FEATURE_ENV]: encodeShellStartupFeatures(wrapperFeatures),
         ...(startupCommand !== undefined
@@ -136,9 +139,10 @@ export function getShellLaunchConfig(
   // Why: mirrors daemon/shell-ready.ts; markerless fish stays unwrapped. The
   // selection is baked into the init command, so fish needs no feature env var.
   if (shellName === 'fish' && (features.includes('ready') || startupCommand !== undefined)) {
+    const userArgs = (customShellArgs ?? ['-l']).filter((a) => a !== '-C')
     return {
       args: [
-        '-l',
+        ...userArgs,
         '-C',
         `${getFishShellReadyInitCommand(
           SHELL_READY_MARKER_ESCAPED,

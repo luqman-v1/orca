@@ -156,8 +156,12 @@ export function getShellLaunchConfig(
     if (features.length === 0 || !ensureShellReadyWrappers()) {
       return UNWRAPPED
     }
+    const wrapperArgs = ['--rcfile', join(getShellReadyWrapperRoot(), 'bash', 'rcfile')]
+    const userArgs = (customShellArgs ?? []).filter(
+      (a, i, arr) => a !== '--rcfile' && arr[i - 1] !== '--rcfile'
+    )
     return {
-      args: ['--rcfile', join(getShellReadyWrapperRoot(), 'bash', 'rcfile')],
+      args: [...wrapperArgs, ...userArgs],
       env: {
         [SHELL_STARTUP_FEATURE_ENV]: encodeShellStartupFeatures(features)
       },
@@ -182,9 +186,10 @@ export function getShellLaunchConfig(
   // Why: mirrors local-pty-shell-ready.ts; markerless fish stays unwrapped. The
   // selection is baked into the init command, so fish needs no feature env var.
   if (shellName === 'fish' && features.includes('ready')) {
+    const userArgs = (customShellArgs ?? ['-l']).filter((a) => a !== '-C')
     return {
       args: [
-        '-l',
+        ...userArgs,
         '-C',
         `${getFishShellReadyInitCommand(SHELL_READY_MARKER)}\n${getFishCodexShellLaunchPreflight()}`
       ],

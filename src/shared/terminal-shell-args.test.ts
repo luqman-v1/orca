@@ -5,6 +5,7 @@ describe('parseShellArgs', () => {
   it('parses empty string to empty array', () => {
     expect(parseShellArgs('')).toEqual([])
     expect(parseShellArgs('   ')).toEqual([])
+    expect(parseShellArgs('\t\n\r')).toEqual([])
   })
 
   it('parses single arguments', () => {
@@ -12,14 +13,18 @@ describe('parseShellArgs', () => {
     expect(parseShellArgs('-i')).toEqual(['-i'])
   })
 
-  it('parses multiple arguments separated by spaces', () => {
+  it('parses multiple arguments separated by spaces and tabs', () => {
     expect(parseShellArgs('-l -i')).toEqual(['-l', '-i'])
-    expect(parseShellArgs('--norc --noprofile')).toEqual(['--norc', '--noprofile'])
+    expect(parseShellArgs('-f\t-i')).toEqual(['-f', '-i'])
+    expect(parseShellArgs('--norc \t --noprofile')).toEqual(['--norc', '--noprofile'])
   })
 
-  it('preserves quoted arguments with spaces', () => {
+  it('preserves quoted arguments with spaces and empty quoted strings', () => {
     expect(parseShellArgs('-c "echo hello world"')).toEqual(['-c', 'echo hello world'])
     expect(parseShellArgs("-c 'echo hello world'")).toEqual(['-c', 'echo hello world'])
+    expect(parseShellArgs('-c ""')).toEqual(['-c', ''])
+    expect(parseShellArgs("-c ''")).toEqual(['-c', ''])
+    expect(parseShellArgs('""')).toEqual([''])
   })
 })
 
@@ -36,5 +41,6 @@ describe('resolveDefaultShellArgs', () => {
   it('returns parsed array when configured with flags', () => {
     expect(resolveDefaultShellArgs('-l')).toEqual(['-l'])
     expect(resolveDefaultShellArgs('-f -i')).toEqual(['-f', '-i'])
+    expect(resolveDefaultShellArgs('-f\t-i')).toEqual(['-f', '-i'])
   })
 })
