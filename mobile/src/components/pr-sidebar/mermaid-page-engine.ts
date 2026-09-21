@@ -15,9 +15,11 @@ export type PageMermaid = {
  * measure as `any` there (a probe assigning `engine.render` to a `number` compiles), and `any`
  * satisfies every signature, so returning it as `PageMermaid` checks the two names and nothing
  * about their shapes. This does: `Mermaid` is precise, so a `PageMermaid` member whose signature
- * the engine does not really have fails here instead of at a call the page makes. The pin lives in
- * this module rather than a test because `mobile/tsconfig.json` excludes test files, so a type-only
- * assertion in one is never compiled.
+ * the engine does not really have fails here instead of at a call the page makes. It lives beside
+ * the type it constrains rather than in a test: `mobile/tsconfig.json` excludes `*.test.ts`, so the
+ * app's own typecheck would not cover it there. Tests are typechecked too, by `tsconfig.test.json`
+ * through the tests-typecheck ratchet, but that is a second program with a grandfathered baseline
+ * and a few files held outside it on purpose, and it is not the gate the shipped build rests on.
  *
  * What no type can check is that the bundle behaves like the package. The render check is that, in
  * both engines, against the native document's own bytes.
