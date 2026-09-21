@@ -47,6 +47,12 @@ import {
  * the phone had already downloaded, so the split moved no bytes and spent 103 of the 256 manifest
  * assets the shell will load. One artifact costs one script and one module.
  *
+ * What the generation weighs, because every chunk ships in it whether or not a phone ever fetches
+ * one: the built bundle is 8,016,714 bytes across 112 assets, against the 9 MiB ceiling in
+ * `verify-mobile-web-app-bundle.mjs`. That is 84.9% of it, with 1,420,470 bytes left for the rest
+ * of C7.10 and for C7.7. Before item B the same bundle was 4,539,090 bytes, and the engine is the
+ * difference — deferring it defers evaluation and a fetch, never the download.
+ *
  * `mobileWebAppRouteClosure` reads `metafile.inputs`, which holds dynamically imported modules
  * under `splitting: true` just as it does under `splitting: false`, so it cannot express "on
  * demand" about anything. Ruling 28: the fence for this route is `entryStaticClosure`, which

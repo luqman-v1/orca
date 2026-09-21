@@ -530,15 +530,16 @@ describe('the Phase C budget', () => {
   })
 
   it('derives the chunk ceiling from the route count, not from a measured number', async () => {
-    // A chunk is emitted per distinct set of importers, so the count is combinatorial rather than
-    // one per route. Measured while building this: 8 routes emit 23 chunks, 10 emit 40, 12 emit
-    // 47, 14 emit 69 -- about 3 more per route at the top. The ceiling allows 4 and starts 16
-    // above zero, so the next few routes land under it instead of failing on a pinned number.
-    // The 14-route reading includes the one script the deferred mermaid artifact costs.
+    // A chunk is emitted per distinct set of importers, so the count is not a function of the
+    // route count alone. Re-measured on this head, by copying the route tree and dropping routes
+    // from the end of the sorted key list -- both siblings of each, because deleting a .web.tsx
+    // alone leaves the native file for the builder to resolve and measures a different closure.
+    // The 14-route reading is the real tree and includes the one script the deferred mermaid
+    // artifact costs.
     for (const [routes, measured] of [
-      [8, 23],
-      [10, 40],
-      [12, 47],
+      [8, 32],
+      [10, 43],
+      [12, 61],
       [14, 69]
     ]) {
       expect(mobileWebAppBundleMaxChunks(routes), `${String(routes)} routes`).toBeGreaterThan(
@@ -547,6 +548,11 @@ describe('the Phase C budget', () => {
     }
     expect(mobileWebAppBundleMaxChunks(14)).toBe(72)
     expect(mobileWebAppBundleMaxChunks(15) - mobileWebAppBundleMaxChunks(14)).toBe(4)
+    // Between four and nine more per route above, so the ceiling is a bound and not a fit -- and
+    // at 14 routes it is a close one. 69 measured against 72, with the last two routes having cost
+    // the 8 the ceiling grants for two: the next route that shares less than its neighbours fails
+    // here, which is what this is for.
+    expect(mobileWebAppBundleMaxChunks(14) - mobileWebAppBundleMaxChunks(12)).toBe(8)
   })
 
   it('refuses an engine chunked along its own lazy boundaries, and passes one artifact', () => {
