@@ -1,8 +1,9 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { extname, join, relative, resolve } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
+import { censusSourceFiles } from '../test-support/census-source-files'
 import {
   UNVALIDATED_RPC_REQUEST_PORT_OWNERS,
   UNVALIDATED_RPC_REQUEST_PORT_PENDING,
@@ -33,10 +34,10 @@ import {
  *   - Test files. `*.test.ts(x)` is not scanned: faking the port is how these suites work, and a
  *     test does not ship. A non-test file that fakes it (tsconfig excludes tests, so some do) is
  *     scanned and listed.
- *   - `*.generated.ts`. These are build outputs, gitignored, and one of them is a bundled vendor
- *     engine whose own dependencies happen to contain the token `sendRequest` — minified third-party
- *     code, not a call site anybody in this repo wrote or can move onto an RpcOperation. The script
- *     that emits each of them is ordinary source and is scanned.
+ *   - Build output. `censusSourceFiles` leaves every `*.generated.ts` out, and one of them is a
+ *     bundled vendor engine whose own dependencies contain the token `sendRequest` — minified
+ *     third-party code, not a call site anybody in this repo wrote or can move onto an
+ *     RpcOperation. The script that emits each of them is ordinary source and is walked.
  * A compile-time fence would catch the first two. That needs `RpcClient` to stop carrying the
  * port, which needs the call sites migrated first — the thing this list is counting down.
  */
@@ -54,19 +55,6 @@ const SELF_FILES = new Set([
 
 /** The coalescing second sender: same unchecked string in, same unread envelope out. */
 const SECOND_SENDER = 'sendSingleFlightRequest'
-
-/** Build output, not code: see the docstring's list of what this does not scan. */
-const GENERATED_FILE = /\.generated\.tsx?$/
-
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name)
-    if (entry.isDirectory()) {
-      return entry.name === 'node_modules' ? [] : sourceFiles(path)
-    }
-    return [path]
-  })
-}
 
 function parse(path: string, source: string): ts.SourceFile {
   const extension = extname(path)
@@ -151,10 +139,9 @@ const inventory: readonly UnvalidatedRpcRequestPortEntry[] = [
 ]
 
 const scanned = scannedRoots
-  .flatMap(sourceFiles)
+  .flatMap(censusSourceFiles)
   .filter((path) => sourceExtensions.has(extname(path)))
   .filter((path) => !/\.test\.tsx?$/.test(path))
-  .filter((path) => !GENERATED_FILE.test(path))
   .map((path) => relative(mobileRoot, path).split(/[/\\]/).join('/'))
   .filter((file) => !SELF_FILES.has(file))
 
@@ -226,17 +213,6 @@ describe('unvalidated RPC request port boundary', () => {
     // so its floor has to come down as the list does rather than fail on a successful step.
     expect(scanned.length).toBeGreaterThan(400)
     expect(observed.size).toBeGreaterThan(20)
-  })
-
-  it('skips build output, and would have flagged the file it skips', () => {
-    // Both halves, because a filter that skipped everything would pass the first alone: nothing
-    // generated is in the scan, and the matcher does see the port inside one when handed it.
-    expect(scanned.filter((file) => GENERATED_FILE.test(file))).toEqual([])
-    expect(rawRequestPortReferences(probe, 'client.sendRequest("x", {})')).toBe(1)
-    expect(GENERATED_FILE.test('src/components/pr-sidebar/mermaid-page-engine.generated.ts')).toBe(
-      true
-    )
-    expect(GENERATED_FILE.test('src/transport/rpc-client.ts')).toBe(false)
   })
 
   it('lists each file once', () => {
