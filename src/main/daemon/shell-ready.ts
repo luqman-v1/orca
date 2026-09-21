@@ -126,7 +126,8 @@ const UNWRAPPED: ShellLaunchConfig = {
  */
 export function getShellLaunchConfig(
   shellPath: string,
-  features: readonly ShellStartupFeature[]
+  features: readonly ShellStartupFeature[],
+  customShellArgs?: string[]
 ): ShellLaunchConfig {
   const shellName = pathWin32.basename(basename(shellPath)).toLowerCase()
 
@@ -134,13 +135,14 @@ export function getShellLaunchConfig(
     if (features.length === 0) {
       return UNWRAPPED
     }
+    const args = customShellArgs ?? ['-l']
     if (!ensureShellReadyWrappers()) {
       // Why plain login zsh: ZDOTDIR pointed at an incomplete wrapper dir makes
       // zsh skip the user's whole config. Losing Orca's features is recoverable.
-      return { args: ['-l'], env: {}, supportsReadyMarker: false }
+      return { args, env: {}, supportsReadyMarker: false }
     }
     return {
-      args: ['-l'],
+      args,
       env: {
         ...inheritedZdotdirEnv(resolveInheritedZdotdir(process.env)),
         ZDOTDIR: join(getShellReadyWrapperRoot(), 'zsh'),

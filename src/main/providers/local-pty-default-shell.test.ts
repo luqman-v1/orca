@@ -36,4 +36,28 @@ describe.skipIf(process.platform === 'win32')('default terminal shell', () => {
     }))
     expect(plan).toMatchObject({ shellPath: '/bin/zsh' })
   })
+
+  it('supports empty shell arguments when configured', () => {
+    const plan = createLocalPtyLaunchPlan({ cwd: '/tmp', cols: 80, rows: 24 }, () => ({
+      getDefaultShell: () => '/bin/zsh',
+      getDefaultShellArgs: () => []
+    }))
+    expect(plan).toMatchObject({ shellPath: '/bin/zsh', shellArgs: [] })
+  })
+
+  it('supports custom flags when configured', () => {
+    const plan = createLocalPtyLaunchPlan({ cwd: '/tmp', cols: 80, rows: 24 }, () => ({
+      getDefaultShell: () => '/bin/zsh',
+      getDefaultShellArgs: () => ['-f', '-i']
+    }))
+    expect(plan).toMatchObject({ shellPath: '/bin/zsh', shellArgs: ['-f', '-i'] })
+  })
+
+  it('defaults shellArgs to login shell -l when unconfigured', () => {
+    const plan = createLocalPtyLaunchPlan({ cwd: '/tmp', cols: 80, rows: 24 }, () => ({
+      getDefaultShell: () => '/bin/zsh',
+      getDefaultShellArgs: () => undefined
+    }))
+    expect(plan).toMatchObject({ shellPath: '/bin/zsh', shellArgs: ['-l'] })
+  })
 })
