@@ -167,6 +167,9 @@ async function buildNativeDocument(outDir) {
   })
   const { buildHtml } = await import(pathToFileURL(nativeHtmlModule).href)
   await writeFile(join(outDir, 'native.html'), buildHtml(FIXTURE), 'utf8')
+  // The same document for a diagram that throws, because the shared config the page introduced
+  // reaches the phone too and one of its keys changes what mermaid does on that path.
+  await writeFile(join(outDir, 'native-broken.html'), buildHtml(BROKEN), 'utf8')
 }
 
 beforeAll(async () => {
@@ -352,17 +355,34 @@ function normaliseSvg(html, id) {
     .replace(/ xmlns:xlink="[^"]*"/g, '')
 }
 
-/** The native document's SVG for `FIXTURE`, rendered in the same browser as the page's. */
-async function readNativeSvg(browser) {
+/**
+ * The native document, loaded in the same browser, with the host it posts to standing in.
+ *
+ * `window.ReactNativeWebView` is what the WebView injects; the document's `post` is a no-op
+ * without it, so the message that drives the component's fallback would be unobservable. Recorded
+ * as a list because the two outcomes are told apart by what it posts: a height, or `error`.
+ */
+async function readNativeDocument(browser, file) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   try {
-    await page.goto(`${origin}/native.html`, { waitUntil: 'load' })
-    await page.waitForFunction(() => document.querySelector('#c svg') !== null, null, {
+    await page.addInitScript(() => {
+      globalThis.__orcaNativePosts = []
+      globalThis.ReactNativeWebView = {
+        postMessage: (message) => globalThis.__orcaNativePosts.push(String(message))
+      }
+    })
+    await page.goto(`${origin}/${file}`, { waitUntil: 'load' })
+    await page.waitForFunction(() => globalThis.__orcaNativePosts.length > 0, null, {
       timeout: 120_000
     })
     return await page.evaluate(() => {
       const svg = document.querySelector('#c svg')
-      return { html: svg.outerHTML, id: svg.id }
+      return {
+        posts: globalThis.__orcaNativePosts,
+        svgs: document.querySelectorAll('svg').length,
+        html: svg?.outerHTML ?? null,
+        id: svg?.id ?? null
+      }
     })
   } finally {
     await page.close()
@@ -407,11 +427,29 @@ describeMermaid(
             expect(fetched.filter((url) => url.includes('/chunk-'))).toHaveLength(1)
             expect(fetched.filter((url) => !url.startsWith(origin))).toEqual([])
 
-            const native = await readNativeSvg(browser)
+            const native = await readNativeDocument(browser, 'native.html')
             expect(normaliseSvg(shown.html, shown.id)).toBe(normaliseSvg(native.html, native.id))
           } finally {
             await page.close()
           }
+        }, 600_000)
+
+        it('leaves the native document reporting a diagram that throws, with nothing drawn', async () => {
+          // The page's shared config reaches the phone as well, and `suppressErrorRendering` is a
+          // key the native path did not have before it. What must not change is that the component
+          // above the WebView still hears about a diagram that throws: `run` rethrows, the
+          // document's own catch posts `error`, and the component swaps in the source box.
+          const broken = await readNativeDocument(browser, 'native-broken.html')
+          expect(broken.posts).toEqual(['error'])
+          // And what the key does change: mermaid draws no error diagram of its own, so the
+          // document is empty behind the fallback rather than showing a diagram for a moment.
+          expect(broken.svgs).toBe(0)
+
+          // The control, the same document for a diagram that parses: a height, not `error`.
+          const rendered = await readNativeDocument(browser, 'native.html')
+          expect(rendered.posts).not.toContain('error')
+          expect(Number(rendered.posts[0])).toBeGreaterThan(0)
+          expect(rendered.svgs).toBe(1)
         }, 600_000)
 
         it('leaves one SVG across a source change, an unmount and a remount', async () => {
