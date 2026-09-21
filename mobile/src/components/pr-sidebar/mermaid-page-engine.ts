@@ -1,17 +1,28 @@
-import type { MermaidConfig } from 'mermaid'
+import type { Mermaid, MermaidConfig } from 'mermaid'
 
 /**
  * The two calls the page makes of mermaid, named rather than cast.
- *
- * The artifact below is minified vendor output, so its own file is unchecked — but its default
- * export still has an inferred type, and returning it as this keeps that inference as the check
- * that the bundle is the engine. A cast here would have asserted the same thing and verified none
- * of it.
  */
 export type PageMermaid = {
   initialize: (config: MermaidConfig) => void
   render: (id: string, text: string) => Promise<{ svg: string }>
 }
+
+/**
+ * The package's own API satisfies the type above, asserted at compile time.
+ *
+ * The loader's return does not assert it. The artifact is minified vendor output and both members
+ * measure as `any` there (a probe assigning `engine.render` to a `number` compiles), and `any`
+ * satisfies every signature, so returning it as `PageMermaid` checks the two names and nothing
+ * about their shapes. This does: `Mermaid` is precise, so a `PageMermaid` member whose signature
+ * the engine does not really have fails here instead of at a call the page makes. The pin lives in
+ * this module rather than a test because `mobile/tsconfig.json` excludes test files, so a type-only
+ * assertion in one is never compiled.
+ *
+ * What no type can check is that the bundle behaves like the package. The render check is that, in
+ * both engines, against the native document's own bytes.
+ */
+const _packageSatisfiesPageMermaid: (engine: Mermaid) => PageMermaid = (engine) => engine
 
 /**
  * The page's mermaid, loaded on demand from one pre-bundled artifact.
